@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-require "spec_helper"
+require 'spec_helper'
 
 class TestOrder
   include Philiprehberger::StateMachine
@@ -96,7 +96,7 @@ RSpec.describe Philiprehberger::StateMachine do
     it "allows transition when guard returns true" do
       order = TestOrder.new
       order.pay!
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       order.ship!
       expect(order.current_state).to eq(:shipped)
     end
@@ -159,7 +159,7 @@ RSpec.describe Philiprehberger::StateMachine do
     it "returns true when guard passes" do
       order = TestOrder.new
       order.pay!
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       expect(order.can_ship?).to be true
     end
   end
@@ -173,7 +173,7 @@ RSpec.describe Philiprehberger::StateMachine do
     it "updates after transition" do
       order = TestOrder.new
       order.pay!
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       expect(order.allowed_transitions).to contain_exactly(:ship, :cancel)
     end
 
@@ -186,7 +186,7 @@ RSpec.describe Philiprehberger::StateMachine do
     it "returns empty array when no transitions are valid" do
       order = TestOrder.new
       order.pay!
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       order.ship!
       order.deliver!
       expect(order.allowed_transitions).to be_empty
@@ -197,7 +197,7 @@ RSpec.describe Philiprehberger::StateMachine do
     it "fires before state change" do
       order = TestOrder.new
       order.pay!
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       order.ship!
       expect(order.callback_log).to include(:before_ship)
     end
@@ -235,7 +235,7 @@ RSpec.describe Philiprehberger::StateMachine do
       order.pay!
       expect(order.current_state).to eq(:paid)
 
-      order.tracking_number = "TRACK123"
+      order.tracking_number = 'TRACK123'
       order.ship!
       expect(order.current_state).to eq(:shipped)
 
