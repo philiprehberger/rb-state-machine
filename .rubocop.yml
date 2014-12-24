@@ -14,5 +14,23 @@ Metrics/BlockLength:
     - "spec/**/*"
     - "*.gemspec"
 
+Metrics/AbcSize:
+  Max: 40
+
+Metrics/MethodLength:
+  Max: 20
+
+Metrics/ParameterLists:
+  Max: 8
+
+Naming/BinaryOperatorParameterName:
+  Enabled: false
+
+Naming/PredicateMethod:
+  Enabled: false
+
+Naming/MethodParameterName:
+  MinNameLength: 1
+
 Layout/LineLength:
   Max: 120
