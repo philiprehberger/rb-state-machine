@@ -9,8 +9,9 @@ Gem::Specification.new do |spec|
   spec.email         = ['me@philiprehberger.com']
 
   spec.summary       = 'Lightweight state machine DSL with transitions, guards, and callbacks'
-  spec.description   = 'A minimal state machine for Ruby objects. Define states, events, transitions, guard conditions, ' \
-                        'and callbacks with a clean DSL. Works with any Ruby class — no ActiveRecord or framework dependency required.'
+  spec.description   = 'A minimal state machine for Ruby objects. Define states, events, ' \
+                        'transitions, guard conditions, and callbacks with a clean DSL. ' \
+                        'Works with any Ruby class — no framework dependency required.'
   spec.homepage      = 'https://github.com/philiprehberger/rb-state-machine'
   spec.license       = 'MIT'
 

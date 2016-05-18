@@ -24,12 +24,12 @@ module Philiprehberger
           initializer = Module.new do
             define_method(:initialize) do |*args, **kwargs, &block|
               @_sm_state = initial
-              if method(:initialize).super_method
-                if kwargs.empty?
-                  super(*args, &block)
-                else
-                  super(*args, **kwargs, &block)
-                end
+              return unless method(:initialize).super_method
+
+              if kwargs.empty?
+                super(*args, &block)
+              else
+                super(*args, **kwargs, &block)
               end
             end
           end
