@@ -3,6 +3,7 @@
 [![Tests](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml)
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-state_machine.svg)](https://rubygems.org/gems/philiprehberger-state_machine)
 [![License](https://img.shields.io/github/license/philiprehberger/rb-state-machine)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
 
 Lightweight state machine DSL with transitions, guards, and callbacks
 
