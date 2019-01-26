@@ -18,9 +18,9 @@ module Philiprehberger
       #
       # @param name [Symbol] event name
       # @yield block evaluated via TransitionBuilder
-      def event(name, &block)
+      def event(name, &)
         builder = TransitionBuilder.new
-        builder.instance_eval(&block)
+        builder.instance_eval(&)
         @events[name] = builder.transitions
       end
 
@@ -28,16 +28,16 @@ module Philiprehberger
       #
       # @param opts [Hash] optional :from and :to state filters
       # @yield [Object] block receives the host object
-      def before_transition(opts = {}, &block)
-        @callback_set.add(type: :before, conditions: opts, &block)
+      def before_transition(opts = {}, &)
+        @callback_set.add(type: :before, conditions: opts, &)
       end
 
       # Register an after_transition callback.
       #
       # @param opts [Hash] optional :from and :to state filters
       # @yield [Object] block receives the host object
-      def after_transition(opts = {}, &block)
-        @callback_set.add(type: :after, conditions: opts, &block)
+      def after_transition(opts = {}, &)
+        @callback_set.add(type: :after, conditions: opts, &)
       end
 
       # Returns all unique states referenced in the definition.
