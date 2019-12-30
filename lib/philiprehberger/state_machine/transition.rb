@@ -30,10 +30,11 @@ module Philiprehberger
 
     # Collects transitions for a single event via the DSL.
     class TransitionBuilder
-      attr_reader :transitions
+      attr_reader :transitions, :parallel_definitions
 
       def initialize
         @transitions = []
+        @parallel_definitions = {}
       end
 
       # Define a transition within an event block.
@@ -43,6 +44,14 @@ module Philiprehberger
       # @param guard [Proc, nil] optional guard lambda
       def transition(from:, to:, guard: nil)
         @transitions << Transition.new(from: from, to: to, guard: guard)
+      end
+
+      # Define parallel substates activated during this transition.
+      #
+      # @param states [Array<Symbol>] substates to activate concurrently
+      def parallel_states(*states)
+        key = @transitions.last&.to || :_default
+        @parallel_definitions[key] = states.flatten
       end
     end
   end
