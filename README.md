@@ -196,6 +196,27 @@ order.transition_stats
 # => {total_transitions: 1, transition_counts: {pending_to_paid: 1}, time_in_states: {...}}
 ```
 
+### State Lifecycle Hooks
+
+Fire callbacks when entering or leaving a specific state, regardless of which event triggered the transition:
+
+```ruby
+state_machine initial: :idle do
+  on_enter(:active) { |obj| obj.log("Entered active") }
+  on_exit(:idle) { |obj| obj.log("Left idle") }
+
+  event :start do
+    transition from: :idle, to: :active
+  end
+end
+```
+
+### Time in Current State
+
+```ruby
+obj.time_in_current_state  # => 12.5 (seconds)
+```
+
 ### DOT/GraphViz Export
 
 Generate a visual state diagram in DOT format:
@@ -245,6 +266,9 @@ Order.unreachable_states  # => [] (all reachable)
 | `#transition_stats` | Returns hash with counts and timing for all transitions |
 | `#parallel_states` | Returns array of currently active parallel substates |
 | `#parallel_state_active?(state)` | Returns true if the given substate is active |
+| `on_enter(state, &block)` | Callback fired when entering a state |
+| `on_exit(state, &block)` | Callback fired when leaving a state |
+| `#time_in_current_state` | Seconds spent in current state |
 | `#check_auto_transitions!` | Fires any pending auto-transitions, returns true if one fired |
 | `.to_dot(name:)` | Generates DOT/GraphViz string for the state machine |
 | `.unreachable_states` | Returns array of states unreachable from initial |
