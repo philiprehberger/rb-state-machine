@@ -4,7 +4,7 @@
 [![Gem Version](https://badge.fury.io/rb/philiprehberger-state_machine.svg)](https://rubygems.org/gems/philiprehberger-state_machine)
 [![Last updated](https://img.shields.io/github/last-commit/philiprehberger/rb-state-machine)](https://github.com/philiprehberger/rb-state-machine/commits/main)
 
-Lightweight state machine DSL with transitions, guards, callbacks, history tracking, auto-transitions, parallel states, statistics, and graph export.
+Lightweight state machine DSL with transitions, guards, callbacks, history tracking, auto-transitions, parallel states, statistics, and graph export
 
 ## Requirements
 
