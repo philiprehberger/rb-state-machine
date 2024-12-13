@@ -8,7 +8,8 @@ Gem::Specification.new do |spec|
   spec.authors = ['Philip Rehberger']
   spec.email = ['me@philiprehberger.com']
 
-  spec.summary = 'Lightweight state machine DSL with transitions, guards, callbacks, history tracking, auto-transitions, parallel states, statistics, and graph export'
+  spec.summary = 'Lightweight state machine DSL with transitions, guards, callbacks, history tracking, ' \
+                 'auto-transitions, parallel states, statistics, and graph export'
   spec.description = 'A minimal state machine for Ruby objects. Define states, events, ' \
                      'transitions, guard conditions, and callbacks with a clean DSL. ' \
                      'Works with any Ruby class — no framework dependency required.'
