@@ -30,9 +30,14 @@ module Philiprehberger
       # @param from [Symbol] source state
       # @param to [Symbol] target state
       # @param context [Object] the object to pass to the callback
-      def execute(type:, from:, to:, context:)
+      # @param payload [Hash] optional event payload forwarded to callbacks that accept it
+      def execute(type:, from:, to:, context:, payload: {})
         matching(type: type, from: from, to: to).each do |callback|
-          callback.block.call(context)
+          if [0, 1].include?(callback.block.arity)
+            callback.block.call(context)
+          else
+            callback.block.call(context, payload)
+          end
         end
       end
 

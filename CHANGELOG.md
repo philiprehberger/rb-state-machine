@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-10
+
+### Added
+- Event payload support: pass keyword arguments when firing events (`order.pay!(amount: 100)`)
+- Payloads are forwarded to guards, before/after callbacks, and on_enter/on_exit hooks
+- `can_X?` and `allowed_transitions` accept optional payload for guard evaluation
+- Fully backwards compatible: existing guards (arity 0) and callbacks (arity 1) continue to work unchanged
+
 ## [0.3.2] - 2026-04-09
 
 ### Fixed

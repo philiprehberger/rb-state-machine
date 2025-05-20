@@ -234,6 +234,33 @@ puts Order.to_dot
 
 Render with GraphViz: `dot -Tpng -o states.png`
 
+### Event Payload
+
+Pass keyword arguments when firing events. Payloads are forwarded to guards, callbacks, and hooks:
+
+```ruby
+class Order
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :pending do
+    event :pay do
+      transition from: :pending, to: :paid, guard: ->(amount:, **) { amount > 0 }
+    end
+
+    after_transition to: :paid do |obj, payload|
+      puts "Paid #{payload[:amount]}"
+    end
+  end
+end
+
+order = Order.new
+order.pay!(amount: 100)      # guard receives amount:, callback receives {amount: 100}
+order.can_pay?(amount: 50)   # => true
+order.can_pay?(amount: 0)    # => false
+```
+
+Existing guards and callbacks with no payload parameter continue to work unchanged.
+
 ### Unreachable State Detection
 
 Validate that all states can be reached from the initial state:
@@ -254,10 +281,10 @@ Order.unreachable_states  # => [] (all reachable)
 | `before_transition(to: nil, from: nil, &block)` | Register a callback that fires before a transition |
 | `after_transition(to: nil, from: nil, &block)` | Register a callback that fires after a transition |
 | `#current_state` | Returns the current state as a symbol |
-| `#can_X?` | Returns true if event X can fire from the current state (including guards) |
-| `#allowed_transitions` | Returns an array of event names that can fire from the current state |
-| `#X!` | Fire event X or raise `InvalidTransition` |
-| `#X` | Fire event X, returns true on success, false on failure |
+| `#can_X?(**payload)` | Returns true if event X can fire from the current state (including guards) |
+| `#allowed_transitions(**payload)` | Returns an array of event names that can fire from the current state |
+| `#X!(**payload)` | Fire event X with optional payload, or raise `InvalidTransition` |
+| `#X(**payload)` | Fire event X with optional payload, returns true on success, false on failure |
 | `#X?` | Returns true if current state is X |
 | `#state_history` | Returns array of `{state:, entered_at:}` hashes |
 | `#previous_state` | Returns the state before the current one, or nil |

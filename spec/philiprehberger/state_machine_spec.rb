@@ -1262,4 +1262,140 @@ RSpec.describe Philiprehberger::StateMachine do
       expect(obj.time_in_current_state).to be < 0.05
     end
   end
+
+  describe 'event payload' do
+    let(:payload_klass) do
+      Class.new do
+        include Philiprehberger::StateMachine
+
+        attr_reader :log
+
+        state_machine initial: :pending do
+          event :pay do
+            transition from: :pending, to: :paid, guard: ->(amount:, **) { amount > 0 }
+          end
+
+          event :ship do
+            transition from: :paid, to: :shipped
+          end
+
+          event :cancel do
+            transition from: %i[pending paid], to: :cancelled
+          end
+
+          before_transition to: :paid do |obj, payload|
+            obj.instance_variable_get(:@log) << { before: payload }
+          end
+
+          after_transition to: :paid do |obj, payload|
+            obj.instance_variable_get(:@log) << { after: payload }
+          end
+
+          # Arity-1 callback to test backwards compatibility
+          after_transition to: :shipped do |obj|
+            obj.instance_variable_get(:@log) << :shipped_no_payload
+          end
+
+          on_enter(:paid) { |obj, payload| obj.instance_variable_get(:@log) << { enter: payload } }
+          on_exit(:pending) { |obj, payload| obj.instance_variable_get(:@log) << { exit: payload } }
+
+          # Arity-1 hook to test backwards compatibility
+          on_enter(:cancelled) { |obj| obj.instance_variable_get(:@log) << :cancelled_enter }
+        end
+
+        def initialize
+          @log = []
+          super
+        end
+      end
+    end
+
+    it 'forwards payload to guard via keyword arguments' do
+      obj = payload_klass.new
+      obj.pay!(amount: 50)
+      expect(obj.current_state).to eq(:paid)
+    end
+
+    it 'guard rejects based on payload value' do
+      obj = payload_klass.new
+      expect { obj.pay!(amount: 0) }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      expect(obj.current_state).to eq(:pending)
+    end
+
+    it 'safe method returns false when guard rejects payload' do
+      obj = payload_klass.new
+      result = obj.pay(amount: -1)
+      expect(result).to be false
+    end
+
+    it 'forwards payload to before_transition callback' do
+      obj = payload_klass.new
+      obj.pay!(amount: 100, method: :card)
+      before_entry = obj.log.find { |e| e.is_a?(Hash) && e[:before] }
+      expect(before_entry[:before]).to eq({ amount: 100, method: :card })
+    end
+
+    it 'forwards payload to after_transition callback' do
+      obj = payload_klass.new
+      obj.pay!(amount: 100)
+      after_entry = obj.log.find { |e| e.is_a?(Hash) && e[:after] }
+      expect(after_entry[:after]).to eq({ amount: 100 })
+    end
+
+    it 'forwards payload to on_enter hook' do
+      obj = payload_klass.new
+      obj.pay!(amount: 75)
+      enter_entry = obj.log.find { |e| e.is_a?(Hash) && e[:enter] }
+      expect(enter_entry[:enter]).to eq({ amount: 75 })
+    end
+
+    it 'forwards payload to on_exit hook' do
+      obj = payload_klass.new
+      obj.pay!(amount: 25)
+      exit_entry = obj.log.find { |e| e.is_a?(Hash) && e[:exit] }
+      expect(exit_entry[:exit]).to eq({ amount: 25 })
+    end
+
+    it 'backwards compatible with arity-1 callbacks' do
+      obj = payload_klass.new
+      obj.pay!(amount: 10)
+      obj.ship!
+      expect(obj.log).to include(:shipped_no_payload)
+    end
+
+    it 'backwards compatible with arity-1 on_enter hooks' do
+      obj = payload_klass.new
+      obj.cancel!
+      expect(obj.log).to include(:cancelled_enter)
+    end
+
+    it 'works with safe method and payload' do
+      obj = payload_klass.new
+      result = obj.pay(amount: 50)
+      expect(result).to be true
+      expect(obj.current_state).to eq(:paid)
+    end
+
+    it 'can_X? accepts payload for guard evaluation' do
+      obj = payload_klass.new
+      expect(obj.can_pay?(amount: 100)).to be true
+      expect(obj.can_pay?(amount: 0)).to be false
+    end
+
+    it 'events without payload still work' do
+      obj = payload_klass.new
+      obj.pay!(amount: 10)
+      obj.ship!
+      expect(obj.current_state).to eq(:shipped)
+    end
+
+    it 'payload does not persist between transitions' do
+      obj = payload_klass.new
+      obj.pay!(amount: 50)
+      obj.ship!
+      # ship callback should not receive pay's payload
+      shipped_entries = obj.log.select { |e| e == :shipped_no_payload }
+      expect(shipped_entries.size).to eq(1)
+    end
+  end
 end
