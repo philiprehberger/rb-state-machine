@@ -202,6 +202,24 @@ class TestFullyConnected
   end
 end
 
+class TestFinalStates
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :pending do
+    state :done, final: true
+    state :cancelled, final: true
+    state :pending
+
+    event :complete do
+      transition from: :pending, to: :done
+    end
+
+    event :cancel do
+      transition from: :pending, to: :cancelled
+    end
+  end
+end
+
 RSpec.describe Philiprehberger::StateMachine do
   it 'has a version number' do
     expect(Philiprehberger::StateMachine::VERSION).not_to be_nil
@@ -1396,6 +1414,75 @@ RSpec.describe Philiprehberger::StateMachine do
       # ship callback should not receive pay's payload
       shipped_entries = obj.log.select { |e| e == :shipped_no_payload }
       expect(shipped_entries.size).to eq(1)
+    end
+  end
+
+  describe 'final/terminal states' do
+    it 'marks a state as final via state :name, final: true' do
+      defn = TestFinalStates._sm_definition
+      expect(defn.final_state?(:done)).to be true
+      expect(defn.final_state?(:cancelled)).to be true
+    end
+
+    it 'does not mark non-final states as final' do
+      defn = TestFinalStates._sm_definition
+      expect(defn.final_state?(:pending)).to be false
+    end
+
+    it 'returns true for #final? when in a final state' do
+      obj = TestFinalStates.new
+      obj.complete!
+      expect(obj.final?).to be true
+    end
+
+    it 'returns true for #terminal? when in a final state' do
+      obj = TestFinalStates.new
+      obj.complete!
+      expect(obj.terminal?).to be true
+    end
+
+    it 'returns false for #final? when not in a final state' do
+      obj = TestFinalStates.new
+      expect(obj.final?).to be false
+    end
+
+    it 'returns false for #terminal? when not in a final state' do
+      obj = TestFinalStates.new
+      expect(obj.terminal?).to be false
+    end
+
+    it 'returns true for #final? in cancelled final state' do
+      obj = TestFinalStates.new
+      obj.cancel!
+      expect(obj.final?).to be true
+    end
+
+    it 'still raises InvalidTransition when transitioning from a final state with no outgoing transitions' do
+      obj = TestFinalStates.new
+      obj.complete!
+      expect(obj.final?).to be true
+      expect { obj.complete! }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      expect { obj.cancel! }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+    end
+
+    it 'keeps #final? false for gems declaring state without the final: option (backward compat)' do
+      # TestOrder is defined without any `state :name, final: true` declarations
+      order = TestOrder.new
+      expect(order.final?).to be false
+      order.pay!
+      expect(order.final?).to be false
+      order.cancel!
+      expect(order.final?).to be false
+    end
+
+    it 'exposes final_states on the definition' do
+      defn = TestFinalStates._sm_definition
+      expect(defn.final_states).to contain_exactly(:done, :cancelled)
+    end
+
+    it 'includes declared-only final states in all_states' do
+      defn = TestFinalStates._sm_definition
+      expect(defn.all_states).to include(:done, :cancelled, :pending)
     end
   end
 end

@@ -5,7 +5,7 @@ module Philiprehberger
     # DSL class used inside the `state_machine` block to define events,
     # transitions, and callbacks.
     class Definition
-      attr_reader :initial, :events, :callback_set, :auto_transitions, :parallel_state_definitions
+      attr_reader :initial, :events, :callback_set, :auto_transitions, :parallel_state_definitions, :final_states
 
       # @param initial [Symbol] the initial state
       def initialize(initial:)
@@ -14,6 +14,28 @@ module Philiprehberger
         @callback_set = CallbackSet.new
         @auto_transitions = []
         @parallel_state_definitions = {}
+        @final_states = []
+      end
+
+      # Declare a state, optionally marking it as final/terminal.
+      #
+      # Calling `state :name` without options is a no-op used for documentation
+      # and introspection. Passing `final: true` marks the state as terminal,
+      # enabling the `#final?` / `#terminal?` predicates on instances.
+      #
+      # @param name [Symbol] the state name
+      # @param final [Boolean] whether this state is terminal
+      def state(name, final: false)
+        @final_states << name if final && !@final_states.include?(name)
+        name
+      end
+
+      # Returns true if the given state name is declared final.
+      #
+      # @param name [Symbol] the state name
+      # @return [Boolean]
+      def final_state?(name)
+        @final_states.include?(name)
       end
 
       # Define an event with transitions.
@@ -86,6 +108,7 @@ module Philiprehberger
           states.concat(Array(at.from))
           states << at.to
         end
+        states.concat(@final_states)
         states.uniq
       end
     end

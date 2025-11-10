@@ -269,11 +269,44 @@ Validate that all states can be reached from the initial state:
 Order.unreachable_states  # => [] (all reachable)
 ```
 
+### Final/Terminal States
+
+Mark states as final to query whether the machine has reached a terminal state:
+
+```ruby
+class Job
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :pending do
+    state :done, final: true
+    state :cancelled, final: true
+
+    event :finish do
+      transition from: :pending, to: :done
+    end
+
+    event :cancel do
+      transition from: :pending, to: :cancelled
+    end
+  end
+end
+
+job = Job.new
+job.final?             # => false
+job.finish!
+job.final?             # => true
+job.terminal?          # => true
+Job._sm_definition.final_state?(:done)  # => true
+```
+
+`#final?` and `#terminal?` are aliases; use whichever reads better in your domain.
+
 ## API
 
 | Method | Description |
 |--------|-------------|
 | `state_machine(initial:, &block)` | Define a state machine on the class with an initial state |
+| `state(name, final: false)` | Declare a state; pass `final: true` to mark it as terminal |
 | `event(name, &block)` | Define an event inside the state machine block |
 | `transition(from:, to:, guard: nil)` | Define a transition inside an event block |
 | `parallel_states(*states)` | Activate concurrent substates during a transition |
@@ -286,6 +319,8 @@ Order.unreachable_states  # => [] (all reachable)
 | `#X!(**payload)` | Fire event X with optional payload, or raise `InvalidTransition` |
 | `#X(**payload)` | Fire event X with optional payload, returns true on success, false on failure |
 | `#X?` | Returns true if current state is X |
+| `#final?` / `#terminal?` | Returns true if the current state is declared final |
+| `Definition#final_state?(name)` | Returns true if the given state is declared final |
 | `#state_history` | Returns array of `{state:, entered_at:}` hashes |
 | `#previous_state` | Returns the state before the current one, or nil |
 | `#transition_count` | Returns total number of transitions performed |
