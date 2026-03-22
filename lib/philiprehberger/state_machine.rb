@@ -1,10 +1,10 @@
 # frozen_string_literal: true
 
-require_relative "state_machine/version"
-require_relative "state_machine/transition"
-require_relative "state_machine/callbacks"
-require_relative "state_machine/definition"
-require_relative "state_machine/instance_methods"
+require_relative 'state_machine/version'
+require_relative 'state_machine/transition'
+require_relative 'state_machine/callbacks'
+require_relative 'state_machine/definition'
+require_relative 'state_machine/instance_methods'
 
 module Philiprehberger
   module StateMachine
