@@ -43,25 +43,25 @@ class TestOrder
 end
 
 RSpec.describe Philiprehberger::StateMachine do
-  it "has a version number" do
+  it 'has a version number' do
     expect(Philiprehberger::StateMachine::VERSION).not_to be_nil
   end
 
-  describe "initial state" do
-    it "sets the initial state correctly" do
+  describe 'initial state' do
+    it 'sets the initial state correctly' do
       order = TestOrder.new
       expect(order.current_state).to eq(:pending)
     end
   end
 
-  describe "valid transitions" do
-    it "changes state with bang method" do
+  describe 'valid transitions' do
+    it 'changes state with bang method' do
       order = TestOrder.new
       order.pay!
       expect(order.current_state).to eq(:paid)
     end
 
-    it "changes state with safe method and returns true" do
+    it 'changes state with safe method and returns true' do
       order = TestOrder.new
       result = order.pay
       expect(result).to be true
@@ -69,13 +69,13 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "invalid transitions" do
-    it "raises InvalidTransition with bang method" do
+  describe 'invalid transitions' do
+    it 'raises InvalidTransition with bang method' do
       order = TestOrder.new
       expect { order.ship! }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
     end
 
-    it "returns false with safe method" do
+    it 'returns false with safe method' do
       order = TestOrder.new
       result = order.ship
       expect(result).to be false
@@ -83,8 +83,8 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "guards" do
-    it "blocks transition when guard returns false" do
+  describe 'guards' do
+    it 'blocks transition when guard returns false' do
       order = TestOrder.new
       order.pay!
       expect(order.current_state).to eq(:paid)
@@ -93,7 +93,7 @@ RSpec.describe Philiprehberger::StateMachine do
       expect(order.current_state).to eq(:paid)
     end
 
-    it "allows transition when guard returns true" do
+    it 'allows transition when guard returns true' do
       order = TestOrder.new
       order.pay!
       order.tracking_number = 'TRACK123'
@@ -101,7 +101,7 @@ RSpec.describe Philiprehberger::StateMachine do
       expect(order.current_state).to eq(:shipped)
     end
 
-    it "safe method returns false when guard fails" do
+    it 'safe method returns false when guard fails' do
       order = TestOrder.new
       order.pay!
       result = order.ship
@@ -109,14 +109,14 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "multiple from states" do
-    it "allows cancel from pending" do
+  describe 'multiple from states' do
+    it 'allows cancel from pending' do
       order = TestOrder.new
       order.cancel!
       expect(order.current_state).to eq(:cancelled)
     end
 
-    it "allows cancel from paid" do
+    it 'allows cancel from paid' do
       order = TestOrder.new
       order.pay!
       order.cancel!
@@ -124,14 +124,14 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "state predicates" do
-    it "returns true for the current state" do
+  describe 'state predicates' do
+    it 'returns true for the current state' do
       order = TestOrder.new
       expect(order.pending?).to be true
       expect(order.paid?).to be false
     end
 
-    it "updates after transition" do
+    it 'updates after transition' do
       order = TestOrder.new
       order.pay!
       expect(order.pending?).to be false
@@ -139,24 +139,24 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "#can_X?" do
-    it "returns true when transition is valid" do
+  describe '#can_X?' do
+    it 'returns true when transition is valid' do
       order = TestOrder.new
       expect(order.can_pay?).to be true
     end
 
-    it "returns false when transition is invalid" do
+    it 'returns false when transition is invalid' do
       order = TestOrder.new
       expect(order.can_ship?).to be false
     end
 
-    it "returns false when guard fails" do
+    it 'returns false when guard fails' do
       order = TestOrder.new
       order.pay!
       expect(order.can_ship?).to be false
     end
 
-    it "returns true when guard passes" do
+    it 'returns true when guard passes' do
       order = TestOrder.new
       order.pay!
       order.tracking_number = 'TRACK123'
@@ -164,26 +164,26 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "#allowed_transitions" do
-    it "lists valid events from current state" do
+  describe '#allowed_transitions' do
+    it 'lists valid events from current state' do
       order = TestOrder.new
       expect(order.allowed_transitions).to contain_exactly(:pay, :cancel)
     end
 
-    it "updates after transition" do
+    it 'updates after transition' do
       order = TestOrder.new
       order.pay!
       order.tracking_number = 'TRACK123'
       expect(order.allowed_transitions).to contain_exactly(:ship, :cancel)
     end
 
-    it "excludes events blocked by guards" do
+    it 'excludes events blocked by guards' do
       order = TestOrder.new
       order.pay!
       expect(order.allowed_transitions).to contain_exactly(:cancel)
     end
 
-    it "returns empty array when no transitions are valid" do
+    it 'returns empty array when no transitions are valid' do
       order = TestOrder.new
       order.pay!
       order.tracking_number = 'TRACK123'
@@ -193,8 +193,8 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "before callbacks" do
-    it "fires before state change" do
+  describe 'before callbacks' do
+    it 'fires before state change' do
       order = TestOrder.new
       order.pay!
       order.tracking_number = 'TRACK123'
@@ -203,23 +203,23 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "after callbacks" do
-    it "fires after state change" do
+  describe 'after callbacks' do
+    it 'fires after state change' do
       order = TestOrder.new
       order.pay!
       expect(order.callback_log).to include(:paid_callback)
     end
   end
 
-  describe "callback filtering by to: state" do
-    it "only fires callback for matching target state" do
+  describe 'callback filtering by to: state' do
+    it 'only fires callback for matching target state' do
       order = TestOrder.new
       order.pay!
       expect(order.callback_log).to include(:paid_callback)
       expect(order.callback_log).not_to include(:cancelled_callback)
     end
 
-    it "fires correct callback on cancel" do
+    it 'fires correct callback on cancel' do
       order = TestOrder.new
       order.cancel!
       expect(order.callback_log).to include(:cancelled_callback)
@@ -227,8 +227,8 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
-  describe "multiple events and states together" do
-    it "supports a full lifecycle" do
+  describe 'multiple events and states together' do
+    it 'supports a full lifecycle' do
       order = TestOrder.new
       expect(order.current_state).to eq(:pending)
 
