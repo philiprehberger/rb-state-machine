@@ -25,7 +25,7 @@ class TestOrder
     end
 
     event :cancel do
-      transition from: [:pending, :paid], to: :cancelled
+      transition from: %i[pending paid], to: :cancelled
     end
 
     before_transition to: :shipped do |obj|
