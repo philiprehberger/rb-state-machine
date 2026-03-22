@@ -9,6 +9,12 @@ Style/Documentation:
 Style/FrozenStringLiteralComment:
   EnforcedStyle: always
 
+Style/ExplicitBlockArgument:
+  Enabled: false
+
+Style/ArgumentsForwarding:
+  Enabled: false
+
 Metrics/BlockLength:
   Exclude:
     - "spec/**/*"
@@ -32,5 +38,17 @@ Naming/PredicateMethod:
 Naming/MethodParameterName:
   MinNameLength: 1
 
+Naming/BlockForwarding:
+  Enabled: false
+
 Layout/LineLength:
   Max: 120
+
+Layout/MultilineMethodCallIndentation:
+  Enabled: false
+
+Layout/LineEndStringConcatenationIndentation:
+  Enabled: false
+
+Bundler/OrderedGems:
+  Enabled: false
