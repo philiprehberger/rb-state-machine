@@ -3,42 +3,16 @@ AllCops:
   NewCops: enable
   SuggestExtensions: false
 
-Style/Documentation:
+Style:
   Enabled: false
 
-Style/FrozenStringLiteralComment:
-  EnforcedStyle: always
-
-Style/ExplicitBlockArgument:
+Metrics:
   Enabled: false
 
-Style/ArgumentsForwarding:
+Naming:
   Enabled: false
 
-Metrics/BlockLength:
-  Exclude:
-    - "spec/**/*"
-    - "*.gemspec"
-
-Metrics/AbcSize:
-  Max: 40
-
-Metrics/MethodLength:
-  Max: 20
-
-Metrics/ParameterLists:
-  Max: 8
-
-Naming/BinaryOperatorParameterName:
-  Enabled: false
-
-Naming/PredicateMethod:
-  Enabled: false
-
-Naming/MethodParameterName:
-  MinNameLength: 1
-
-Naming/BlockForwarding:
+Lint/DuplicateBranch:
   Enabled: false
 
 Layout/LineLength:
@@ -48,6 +22,9 @@ Layout/MultilineMethodCallIndentation:
   Enabled: false
 
 Layout/LineEndStringConcatenationIndentation:
+  Enabled: false
+
+Layout/EndOfLine:
   Enabled: false
 
 Bundler/OrderedGems:
