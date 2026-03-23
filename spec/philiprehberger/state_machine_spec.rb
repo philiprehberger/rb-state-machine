@@ -243,4 +243,102 @@ RSpec.describe Philiprehberger::StateMachine do
       expect(order.current_state).to eq(:delivered)
     end
   end
+
+  describe 'guard returning false blocks transition with safe method' do
+    it 'does not change state when guard fails' do
+      order = TestOrder.new
+      order.pay!
+      order.tracking_number = nil
+      result = order.ship
+      expect(result).to be false
+      expect(order.current_state).to eq(:paid)
+    end
+  end
+
+  describe 'callback execution order' do
+    it 'fires before_transition before after_transition' do
+      order = TestOrder.new
+      order.pay!
+      order.tracking_number = 'TRACK123'
+      order.callback_log.clear
+      order.ship!
+      expect(order.callback_log.first).to eq(:before_ship)
+    end
+  end
+
+  describe 'invalid event raises on bang' do
+    it 'raises InvalidTransition for deliver from pending' do
+      order = TestOrder.new
+      expect { order.deliver! }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+    end
+
+    it 'includes event and state info in error message' do
+      order = TestOrder.new
+      expect { order.deliver! }.to raise_error(/Cannot deliver from pending/)
+    end
+  end
+
+  describe 'predicate methods for all states' do
+    it 'generates shipped? predicate' do
+      order = TestOrder.new
+      expect(order.shipped?).to be false
+      order.pay!
+      order.tracking_number = 'T1'
+      order.ship!
+      expect(order.shipped?).to be true
+    end
+
+    it 'generates delivered? predicate' do
+      order = TestOrder.new
+      expect(order.delivered?).to be false
+    end
+
+    it 'generates cancelled? predicate' do
+      order = TestOrder.new
+      order.cancel!
+      expect(order.cancelled?).to be true
+    end
+  end
+
+  describe 'allowed_transitions accuracy' do
+    it 'returns only cancel for cancelled state' do
+      order = TestOrder.new
+      order.cancel!
+      expect(order.allowed_transitions).to be_empty
+    end
+
+    it 'includes ship when guard passes' do
+      order = TestOrder.new
+      order.pay!
+      order.tracking_number = 'T1'
+      expect(order.allowed_transitions).to include(:ship)
+    end
+
+    it 'excludes ship when guard fails' do
+      order = TestOrder.new
+      order.pay!
+      expect(order.allowed_transitions).not_to include(:ship)
+    end
+  end
+
+  describe 'can_X? with multiple from states' do
+    it 'can_cancel? from pending' do
+      order = TestOrder.new
+      expect(order.can_cancel?).to be true
+    end
+
+    it 'can_cancel? from paid' do
+      order = TestOrder.new
+      order.pay!
+      expect(order.can_cancel?).to be true
+    end
+
+    it 'cannot cancel from shipped' do
+      order = TestOrder.new
+      order.pay!
+      order.tracking_number = 'T1'
+      order.ship!
+      expect(order.can_cancel?).to be false
+    end
+  end
 end
