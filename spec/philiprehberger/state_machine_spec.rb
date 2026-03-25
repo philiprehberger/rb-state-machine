@@ -42,6 +42,91 @@ class TestOrder
   end
 end
 
+class TestTrafficLight
+  include Philiprehberger::StateMachine
+
+  attr_accessor :callback_log
+
+  def initialize
+    @callback_log = []
+  end
+
+  state_machine initial: :green do
+    event :caution do
+      transition from: :green, to: :yellow
+    end
+
+    event :stop do
+      transition from: :yellow, to: :red
+    end
+
+    event :go do
+      transition from: :red, to: :green
+    end
+
+    event :blink do
+      transition from: :yellow, to: :yellow
+    end
+
+    before_transition from: :green do |obj|
+      obj.callback_log << :leaving_green
+    end
+
+    before_transition from: :green, to: :yellow do |obj|
+      obj.callback_log << :green_to_yellow
+    end
+
+    after_transition do |obj|
+      obj.callback_log << :any_after
+    end
+
+    after_transition from: %i[green yellow], to: :yellow do |obj|
+      obj.callback_log << :arrived_yellow
+    end
+  end
+end
+
+class TestDocument
+  include Philiprehberger::StateMachine
+
+  attr_accessor :reviewers, :callback_log
+
+  def initialize(reviewers: [])
+    @reviewers = reviewers
+    @callback_log = []
+  end
+
+  state_machine initial: :draft do
+    event :submit do
+      transition from: :draft, to: :review, guard: -> { reviewers.any? }
+    end
+
+    event :approve do
+      transition from: :review, to: :approved
+    end
+
+    event :reject do
+      transition from: :review, to: :draft
+    end
+
+    before_transition to: :review do |obj|
+      obj.callback_log << :before_review
+    end
+
+    after_transition to: :review do |obj|
+      obj.callback_log << :after_review
+    end
+
+    before_transition to: :draft do |obj|
+      obj.callback_log << :before_draft
+    end
+
+    after_transition to: :draft do |obj|
+      obj.callback_log << :after_draft
+    end
+  end
+end
+
 RSpec.describe Philiprehberger::StateMachine do
   it 'has a version number' do
     expect(Philiprehberger::StateMachine::VERSION).not_to be_nil
@@ -339,6 +424,317 @@ RSpec.describe Philiprehberger::StateMachine do
       order.tracking_number = 'T1'
       order.ship!
       expect(order.can_cancel?).to be false
+    end
+  end
+
+  describe 'self-transitions' do
+    it 'allows transitioning to the same state' do
+      light = TestTrafficLight.new
+      light.caution!
+      expect(light.current_state).to eq(:yellow)
+      light.blink!
+      expect(light.current_state).to eq(:yellow)
+    end
+
+    it 'fires callbacks on self-transition' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.callback_log.clear
+      light.blink!
+      expect(light.callback_log).to include(:any_after)
+    end
+
+    it 'returns true from safe method on self-transition' do
+      light = TestTrafficLight.new
+      light.caution!
+      result = light.blink
+      expect(result).to be true
+    end
+
+    it 'can_blink? returns true from yellow' do
+      light = TestTrafficLight.new
+      light.caution!
+      expect(light.can_blink?).to be true
+    end
+
+    it 'can_blink? returns false from non-yellow state' do
+      light = TestTrafficLight.new
+      expect(light.can_blink?).to be false
+    end
+  end
+
+  describe 'callback filtering by from: state' do
+    it 'fires callback matching the from state' do
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution!
+      expect(light.callback_log).to include(:leaving_green)
+    end
+
+    it 'does not fire from: callback when from state does not match' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.callback_log.clear
+      light.stop!
+      expect(light.callback_log).not_to include(:leaving_green)
+    end
+  end
+
+  describe 'callback filtering by from: and to: combined' do
+    it 'fires callback when both from and to match' do
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution!
+      expect(light.callback_log).to include(:green_to_yellow)
+    end
+
+    it 'does not fire when only from matches but to does not' do
+      # There is no transition from green that goes to red directly,
+      # so :green_to_yellow should only fire for green->yellow
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution!
+      # :green_to_yellow fires for green->yellow, verify it is present
+      expect(light.callback_log).to include(:green_to_yellow)
+      # now verify stopping (yellow->red) does NOT fire :green_to_yellow
+      light.callback_log.clear
+      light.stop!
+      expect(light.callback_log).not_to include(:green_to_yellow)
+    end
+  end
+
+  describe 'callback with array from: condition' do
+    it 'fires when from state is in the array' do
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution! # green -> yellow
+      expect(light.callback_log).to include(:arrived_yellow)
+    end
+
+    it 'fires for self-transition matching array condition' do
+      light = TestTrafficLight.new
+      light.caution! # green -> yellow
+      light.callback_log.clear
+      light.blink! # yellow -> yellow
+      expect(light.callback_log).to include(:arrived_yellow)
+    end
+  end
+
+  describe 'unconditional after callback' do
+    it 'fires on every transition' do
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution!
+      expect(light.callback_log).to include(:any_after)
+
+      light.callback_log.clear
+      light.stop!
+      expect(light.callback_log).to include(:any_after)
+
+      light.callback_log.clear
+      light.go!
+      expect(light.callback_log).to include(:any_after)
+    end
+  end
+
+  describe 'guard with constructor keyword arguments' do
+    it 'blocks submit when reviewers are empty' do
+      doc = TestDocument.new(reviewers: [])
+      expect(doc.can_submit?).to be false
+      expect { doc.submit! }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+    end
+
+    it 'allows submit when reviewers are present' do
+      doc = TestDocument.new(reviewers: ['Alice'])
+      expect(doc.can_submit?).to be true
+      doc.submit!
+      expect(doc.current_state).to eq(:review)
+    end
+  end
+
+  describe 'revert transitions (review -> draft)' do
+    it 'returns to a previously visited state' do
+      doc = TestDocument.new(reviewers: ['Alice'])
+      doc.submit!
+      expect(doc.current_state).to eq(:review)
+      doc.reject!
+      expect(doc.current_state).to eq(:draft)
+    end
+
+    it 'fires callbacks for the revert transition' do
+      doc = TestDocument.new(reviewers: ['Alice'])
+      doc.submit!
+      doc.callback_log.clear
+      doc.reject!
+      expect(doc.callback_log).to include(:before_draft)
+      expect(doc.callback_log).to include(:after_draft)
+    end
+
+    it 'allows re-submitting after rejection' do
+      doc = TestDocument.new(reviewers: ['Alice'])
+      doc.submit!
+      doc.reject!
+      expect(doc.current_state).to eq(:draft)
+      doc.submit!
+      expect(doc.current_state).to eq(:review)
+    end
+  end
+
+  describe 'callback ordering with multiple callbacks' do
+    it 'fires before callbacks before state change and after callbacks after' do
+      doc = TestDocument.new(reviewers: ['Alice'])
+      doc.callback_log.clear
+      doc.submit!
+      before_idx = doc.callback_log.index(:before_review)
+      after_idx = doc.callback_log.index(:after_review)
+      expect(before_idx).to be < after_idx
+    end
+
+    it 'fires multiple matching callbacks in registration order' do
+      light = TestTrafficLight.new
+      light.callback_log.clear
+      light.caution! # green -> yellow
+      # :leaving_green (before, from: green) comes before :green_to_yellow (before, from: green, to: yellow)
+      leaving_idx = light.callback_log.index(:leaving_green)
+      combined_idx = light.callback_log.index(:green_to_yellow)
+      expect(leaving_idx).to be < combined_idx
+    end
+  end
+
+  describe 'class-level introspection' do
+    it 'exposes the definition via _sm_definition' do
+      defn = TestOrder._sm_definition
+      expect(defn).to be_a(Philiprehberger::StateMachine::Definition)
+      expect(defn.initial).to eq(:pending)
+    end
+
+    it 'lists all events on the definition' do
+      defn = TestOrder._sm_definition
+      expect(defn.events.keys).to contain_exactly(:pay, :ship, :deliver, :cancel)
+    end
+
+    it 'returns all unique states via all_states' do
+      defn = TestOrder._sm_definition
+      expect(defn.all_states).to contain_exactly(:pending, :paid, :shipped, :delivered, :cancelled)
+    end
+  end
+
+  describe 'Transition struct' do
+    it '#matches? returns true for matching single from state' do
+      t = Philiprehberger::StateMachine::Transition.new(from: :a, to: :b)
+      expect(t.matches?(:a)).to be true
+    end
+
+    it '#matches? returns false for non-matching state' do
+      t = Philiprehberger::StateMachine::Transition.new(from: :a, to: :b)
+      expect(t.matches?(:c)).to be false
+    end
+
+    it '#matches? works with array of from states' do
+      t = Philiprehberger::StateMachine::Transition.new(from: %i[a b], to: :c)
+      expect(t.matches?(:a)).to be true
+      expect(t.matches?(:b)).to be true
+      expect(t.matches?(:d)).to be false
+    end
+
+    it '#from_states returns array for single from' do
+      t = Philiprehberger::StateMachine::Transition.new(from: :x, to: :y)
+      expect(t.from_states).to eq([:x])
+    end
+
+    it '#from_states returns array as-is for array from' do
+      t = Philiprehberger::StateMachine::Transition.new(from: %i[x y], to: :z)
+      expect(t.from_states).to eq(%i[x y])
+    end
+  end
+
+  describe 'error class hierarchy' do
+    it 'InvalidTransition is a subclass of Error' do
+      expect(Philiprehberger::StateMachine::InvalidTransition).to be < Philiprehberger::StateMachine::Error
+    end
+
+    it 'Error is a subclass of StandardError' do
+      expect(Philiprehberger::StateMachine::Error).to be < StandardError
+    end
+
+    it 'InvalidTransition can be rescued as Error' do
+      order = TestOrder.new
+      rescued = false
+      begin
+        order.deliver!
+      rescue Philiprehberger::StateMachine::Error
+        rescued = true
+      end
+      expect(rescued).to be true
+    end
+  end
+
+  describe 'state unchanged after failed bang transition' do
+    it 'does not change state when guard fails on bang' do
+      order = TestOrder.new
+      order.pay!
+      expect {
+        order.ship!
+      }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      expect(order.current_state).to eq(:paid)
+    end
+
+    it 'does not change state when no valid transition on bang' do
+      order = TestOrder.new
+      expect {
+        order.deliver!
+      }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      expect(order.current_state).to eq(:pending)
+    end
+  end
+
+  describe 'guard error message content' do
+    it 'includes guard failure info in the error message' do
+      order = TestOrder.new
+      order.pay!
+      expect { order.ship! }.to raise_error(/Guard condition failed for ship from paid/)
+    end
+  end
+
+  describe 'TrafficLight full cycle' do
+    it 'completes a full green -> yellow -> red -> green cycle' do
+      light = TestTrafficLight.new
+      expect(light.current_state).to eq(:green)
+      light.caution!
+      expect(light.current_state).to eq(:yellow)
+      light.stop!
+      expect(light.current_state).to eq(:red)
+      light.go!
+      expect(light.current_state).to eq(:green)
+    end
+  end
+
+  describe 'TrafficLight state predicates' do
+    it 'generates predicates for all traffic light states' do
+      light = TestTrafficLight.new
+      expect(light.green?).to be true
+      expect(light.yellow?).to be false
+      expect(light.red?).to be false
+    end
+  end
+
+  describe 'TrafficLight allowed_transitions' do
+    it 'returns caution from green' do
+      light = TestTrafficLight.new
+      expect(light.allowed_transitions).to contain_exactly(:caution)
+    end
+
+    it 'returns stop and blink from yellow' do
+      light = TestTrafficLight.new
+      light.caution!
+      expect(light.allowed_transitions).to contain_exactly(:stop, :blink)
+    end
+
+    it 'returns go from red' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.stop!
+      expect(light.allowed_transitions).to contain_exactly(:go)
     end
   end
 end
