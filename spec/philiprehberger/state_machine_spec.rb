@@ -673,17 +673,17 @@ RSpec.describe Philiprehberger::StateMachine do
     it 'does not change state when guard fails on bang' do
       order = TestOrder.new
       order.pay!
-      expect {
+      expect do
         order.ship!
-      }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      end.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
       expect(order.current_state).to eq(:paid)
     end
 
     it 'does not change state when no valid transition on bang' do
       order = TestOrder.new
-      expect {
+      expect do
         order.deliver!
-      }.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
+      end.to raise_error(Philiprehberger::StateMachine::InvalidTransition)
       expect(order.current_state).to eq(:pending)
     end
   end
