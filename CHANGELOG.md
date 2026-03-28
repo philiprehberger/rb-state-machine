@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-28
+
+### Added
+- State history tracking with timestamps via `state_history` and `previous_state`
+- Timed/automatic transitions with `auto_transition from:, to:, after:` DSL and `check_auto_transitions!`
+- Parallel/concurrent substates with `parallel_states` DSL within events
+- Transition statistics tracking via `transition_count`, `time_in_state`, and `transition_stats`
+- DOT/GraphViz export for visual state diagrams via `MyClass.to_dot`
+- Unreachable state detection and validation via `MyClass.unreachable_states`
+
 ## [0.1.2] - 2026-03-24
 
 ### Changed

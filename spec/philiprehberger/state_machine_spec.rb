@@ -127,6 +127,81 @@ class TestDocument
   end
 end
 
+class TestAutoTransition
+  include Philiprehberger::StateMachine
+
+  attr_accessor :callback_log
+
+  def initialize
+    @callback_log = []
+  end
+
+  state_machine initial: :pending do
+    event :activate do
+      transition from: :pending, to: :active
+    end
+
+    event :complete do
+      transition from: :active, to: :completed
+    end
+
+    auto_transition from: :pending, to: :expired, after: 300
+
+    auto_transition from: :active, to: :timed_out, after: 600, guard: -> { !@keep_alive }
+
+    after_transition to: :expired do |obj|
+      obj.callback_log << :expired_callback
+    end
+  end
+end
+
+class TestParallelStates
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :idle do
+    event :start_processing do
+      transition from: :idle, to: :processing
+      parallel_states :uploading, :validating
+    end
+
+    event :finish do
+      transition from: :processing, to: :done
+    end
+  end
+end
+
+class TestUnreachable
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :a do
+    event :go_b do
+      transition from: :a, to: :b
+    end
+
+    event :go_c do
+      transition from: :b, to: :c
+    end
+
+    event :go_orphan do
+      transition from: :orphan, to: :orphan_target
+    end
+  end
+end
+
+class TestFullyConnected
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :a do
+    event :go_b do
+      transition from: :a, to: :b
+    end
+
+    event :go_a do
+      transition from: :b, to: :a
+    end
+  end
+end
+
 RSpec.describe Philiprehberger::StateMachine do
   it 'has a version number' do
     expect(Philiprehberger::StateMachine::VERSION).not_to be_nil
@@ -735,6 +810,375 @@ RSpec.describe Philiprehberger::StateMachine do
       light.caution!
       light.stop!
       expect(light.allowed_transitions).to contain_exactly(:go)
+    end
+  end
+
+  # ===== NEW FEATURE TESTS =====
+
+  describe 'state history tracking' do
+    it 'records the initial state in history' do
+      order = TestOrder.new
+      history = order.state_history
+      expect(history.size).to eq(1)
+      expect(history.first[:state]).to eq(:pending)
+      expect(history.first[:entered_at]).to be_a(Time)
+    end
+
+    it 'records transitions in history' do
+      order = TestOrder.new
+      order.pay!
+      history = order.state_history
+      expect(history.size).to eq(2)
+      expect(history.map { |h| h[:state] }).to eq(%i[pending paid])
+    end
+
+    it 'records full lifecycle in history' do
+      order = TestOrder.new
+      order.pay!
+      order.tracking_number = 'T1'
+      order.ship!
+      order.deliver!
+      history = order.state_history
+      expect(history.size).to eq(4)
+      expect(history.map { |h| h[:state] }).to eq(%i[pending paid shipped delivered])
+    end
+
+    it 'includes timestamps for each entry' do
+      order = TestOrder.new
+      order.pay!
+      history = order.state_history
+      history.each do |entry|
+        expect(entry[:entered_at]).to be_a(Time)
+      end
+    end
+
+    it 'returns previous_state correctly' do
+      order = TestOrder.new
+      expect(order.previous_state).to be_nil
+      order.pay!
+      expect(order.previous_state).to eq(:pending)
+      order.tracking_number = 'T1'
+      order.ship!
+      expect(order.previous_state).to eq(:paid)
+    end
+
+    it 'tracks history with safe transition method' do
+      order = TestOrder.new
+      order.pay
+      history = order.state_history
+      expect(history.size).to eq(2)
+      expect(history.last[:state]).to eq(:paid)
+    end
+
+    it 'does not add history entry on failed transition' do
+      order = TestOrder.new
+      order.ship # fails silently
+      history = order.state_history
+      expect(history.size).to eq(1)
+    end
+
+    it 'tracks self-transitions in history' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.blink!
+      history = light.state_history
+      expect(history.size).to eq(3)
+      expect(history.map { |h| h[:state] }).to eq(%i[green yellow yellow])
+    end
+  end
+
+  describe 'transition statistics' do
+    it 'starts with zero transition count' do
+      order = TestOrder.new
+      expect(order.transition_count).to eq(0)
+    end
+
+    it 'increments transition count on each transition' do
+      order = TestOrder.new
+      order.pay!
+      expect(order.transition_count).to eq(1)
+      order.tracking_number = 'T1'
+      order.ship!
+      expect(order.transition_count).to eq(2)
+    end
+
+    it 'counts transitions with safe method' do
+      order = TestOrder.new
+      order.pay
+      expect(order.transition_count).to eq(1)
+    end
+
+    it 'does not count failed transitions' do
+      order = TestOrder.new
+      order.ship # fails
+      expect(order.transition_count).to eq(0)
+    end
+
+    it 'returns time_in_state as a positive number' do
+      order = TestOrder.new
+      time = order.time_in_state(:pending)
+      expect(time).to be >= 0
+    end
+
+    it 'returns zero for unvisited states' do
+      order = TestOrder.new
+      expect(order.time_in_state(:paid)).to eq(0)
+    end
+
+    it 'returns transition_stats as a hash' do
+      order = TestOrder.new
+      order.pay!
+      stats = order.transition_stats
+      expect(stats).to be_a(Hash)
+      expect(stats[:total_transitions]).to eq(1)
+      expect(stats[:transition_counts]).to include(pending_to_paid: 1)
+      expect(stats[:time_in_states]).to be_a(Hash)
+    end
+
+    it 'tracks multiple transition types' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.stop!
+      light.go!
+      stats = light.transition_stats
+      expect(stats[:total_transitions]).to eq(3)
+      expect(stats[:transition_counts][:green_to_yellow]).to eq(1)
+      expect(stats[:transition_counts][:yellow_to_red]).to eq(1)
+      expect(stats[:transition_counts][:red_to_green]).to eq(1)
+    end
+
+    it 'counts repeated transitions' do
+      light = TestTrafficLight.new
+      light.caution!
+      light.blink!
+      light.blink!
+      stats = light.transition_stats
+      expect(stats[:transition_counts][:yellow_to_yellow]).to eq(2)
+    end
+  end
+
+  describe 'timed/automatic transitions' do
+    it 'does not auto-transition before time has elapsed' do
+      obj = TestAutoTransition.new
+      result = obj.check_auto_transitions!
+      expect(result).to be false
+      expect(obj.current_state).to eq(:pending)
+    end
+
+    it 'auto-transitions when time has elapsed' do
+      obj = TestAutoTransition.new
+      # Simulate time passing by manipulating the entered_at time
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 301)
+      result = obj.check_auto_transitions!
+      expect(result).to be true
+      expect(obj.current_state).to eq(:expired)
+    end
+
+    it 'fires callbacks on auto-transition' do
+      obj = TestAutoTransition.new
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 301)
+      obj.check_auto_transitions!
+      expect(obj.callback_log).to include(:expired_callback)
+    end
+
+    it 'records auto-transition in history' do
+      obj = TestAutoTransition.new
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 301)
+      obj.check_auto_transitions!
+      history = obj.state_history
+      expect(history.map { |h| h[:state] }).to eq(%i[pending expired])
+    end
+
+    it 'records auto-transition in statistics' do
+      obj = TestAutoTransition.new
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 301)
+      obj.check_auto_transitions!
+      expect(obj.transition_count).to eq(1)
+    end
+
+    it 'respects guard on auto-transition' do
+      obj = TestAutoTransition.new
+      obj.activate!
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 601)
+      obj.instance_variable_set(:@keep_alive, true)
+      result = obj.check_auto_transitions!
+      expect(result).to be false
+      expect(obj.current_state).to eq(:active)
+    end
+
+    it 'auto-transitions when guard passes' do
+      obj = TestAutoTransition.new
+      obj.activate!
+      obj.instance_variable_set(:@_sm_state_entered_at, Time.now - 601)
+      obj.instance_variable_set(:@keep_alive, false)
+      result = obj.check_auto_transitions!
+      expect(result).to be true
+      expect(obj.current_state).to eq(:timed_out)
+    end
+
+    it 'includes auto_transition states in all_states' do
+      defn = TestAutoTransition._sm_definition
+      expect(defn.all_states).to include(:expired, :timed_out)
+    end
+  end
+
+  describe 'parallel/concurrent states' do
+    it 'starts with no parallel states' do
+      obj = TestParallelStates.new
+      expect(obj.parallel_states).to be_empty
+    end
+
+    it 'activates parallel states on transition' do
+      obj = TestParallelStates.new
+      obj.start_processing!
+      expect(obj.parallel_states).to contain_exactly(:uploading, :validating)
+    end
+
+    it 'checks individual parallel state activity' do
+      obj = TestParallelStates.new
+      obj.start_processing!
+      expect(obj.parallel_state_active?(:uploading)).to be true
+      expect(obj.parallel_state_active?(:validating)).to be true
+      expect(obj.parallel_state_active?(:other)).to be false
+    end
+
+    it 'deactivates parallel states on next transition without parallel_states' do
+      obj = TestParallelStates.new
+      obj.start_processing!
+      expect(obj.parallel_states).not_to be_empty
+      obj.finish!
+      expect(obj.parallel_states).to be_empty
+    end
+
+    it 'works with safe transition method' do
+      obj = TestParallelStates.new
+      obj.start_processing
+      expect(obj.parallel_states).to contain_exactly(:uploading, :validating)
+    end
+  end
+
+  describe 'DOT/GraphViz export' do
+    it 'generates valid DOT output' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('digraph')
+      expect(dot).to include('rankdir=LR')
+    end
+
+    it 'includes initial state indicator' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('__start__')
+      expect(dot).to include('__start__ -> pending')
+    end
+
+    it 'includes all state nodes' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('pending [shape=ellipse]')
+      expect(dot).to include('paid [shape=ellipse]')
+      expect(dot).to include('shipped [shape=ellipse]')
+      expect(dot).to include('delivered [shape=ellipse]')
+      expect(dot).to include('cancelled [shape=ellipse]')
+    end
+
+    it 'includes transition edges with event labels' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('pending -> paid [label="pay"]')
+      expect(dot).to include('shipped -> delivered [label="deliver"]')
+    end
+
+    it 'marks guarded transitions' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('paid -> shipped [label="ship [guarded]"]')
+    end
+
+    it 'includes transitions from multiple source states' do
+      dot = TestOrder.to_dot
+      expect(dot).to include('pending -> cancelled [label="cancel"]')
+      expect(dot).to include('paid -> cancelled [label="cancel"]')
+    end
+
+    it 'accepts a custom graph name' do
+      dot = TestOrder.to_dot(name: 'OrderFlow')
+      expect(dot).to include('digraph OrderFlow')
+    end
+
+    it 'includes auto-transitions with dashed style' do
+      dot = TestAutoTransition.to_dot
+      expect(dot).to include('pending -> expired [label="auto(300s)", style=dashed]')
+    end
+
+    it 'raises error when no state machine is defined' do
+      klass = Class.new { include Philiprehberger::StateMachine }
+      expect { klass.to_dot }.to raise_error(Philiprehberger::StateMachine::Error)
+    end
+  end
+
+  describe 'unreachable state detection' do
+    it 'detects unreachable states' do
+      unreachable = TestUnreachable.unreachable_states
+      expect(unreachable).to include(:orphan)
+      expect(unreachable).to include(:orphan_target)
+    end
+
+    it 'does not flag reachable states' do
+      unreachable = TestUnreachable.unreachable_states
+      expect(unreachable).not_to include(:a)
+      expect(unreachable).not_to include(:b)
+      expect(unreachable).not_to include(:c)
+    end
+
+    it 'returns empty array when all states are reachable' do
+      unreachable = TestFullyConnected.unreachable_states
+      expect(unreachable).to be_empty
+    end
+
+    it 'returns empty for simple linear machine' do
+      unreachable = TestOrder.unreachable_states
+      expect(unreachable).to be_empty
+    end
+
+    it 'raises error when no state machine is defined' do
+      klass = Class.new { include Philiprehberger::StateMachine }
+      expect { klass.unreachable_states }.to raise_error(Philiprehberger::StateMachine::Error)
+    end
+  end
+
+  describe 'Validation module' do
+    it 'finds reachable states via BFS' do
+      defn = TestUnreachable._sm_definition
+      reachable = Philiprehberger::StateMachine::Validation.reachable_states(defn)
+      expect(reachable).to contain_exactly(:a, :b, :c)
+    end
+
+    it 'finds predecessors of a state' do
+      defn = TestOrder._sm_definition
+      preds = Philiprehberger::StateMachine::Validation.predecessors(defn, :cancelled)
+      expect(preds).to contain_exactly(:pending, :paid)
+    end
+
+    it 'returns empty predecessors for initial state with no inbound transitions' do
+      defn = TestUnreachable._sm_definition
+      preds = Philiprehberger::StateMachine::Validation.predecessors(defn, :a)
+      expect(preds).to be_empty
+    end
+  end
+
+  describe 'History class' do
+    it 'respects max_size limit' do
+      history = Philiprehberger::StateMachine::History.new(:start, max_size: 3)
+      history.record(:a)
+      history.record(:b)
+      history.record(:c)
+      # Now has 4 entries (start + 3), should trim to 3
+      expect(history.size).to eq(3)
+      expect(history.entries.first[:state]).to eq(:a)
+    end
+  end
+
+  describe 'Statistics class' do
+    it 'tracks time in current state' do
+      stats = Philiprehberger::StateMachine::Statistics.new(:idle)
+      time = stats.time_in_state(:idle)
+      expect(time).to be >= 0
     end
   end
 end

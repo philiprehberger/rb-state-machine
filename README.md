@@ -1,11 +1,8 @@
 # philiprehberger-state_machine
 
-[![Tests](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml)
-[![Gem Version](https://badge.fury.io/rb/philiprehberger-state_machine.svg)](https://rubygems.org/gems/philiprehberger-state_machine)
-[![License](https://img.shields.io/github/license/philiprehberger/rb-state-machine)](LICENSE)
-[![Sponsor](https://img.shields.io/badge/sponsor-GitHub%20Sponsors-ec6cb9)](https://github.com/sponsors/philiprehberger)
+[![Tests](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml/badge.svg)](https://github.com/philiprehberger/rb-state-machine/actions/workflows/ci.yml) [![Gem Version](https://img.shields.io/gem/v/philiprehberger-state_machine)](https://rubygems.org/gems/philiprehberger-state_machine) [![GitHub release](https://img.shields.io/github/v/release/philiprehberger/rb-state-machine)](https://github.com/philiprehberger/rb-state-machine/releases) [![GitHub last commit](https://img.shields.io/github/last-commit/philiprehberger/rb-state-machine)](https://github.com/philiprehberger/rb-state-machine/commits/main) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) [![Bug Reports](https://img.shields.io/badge/bug-reports-red.svg)](https://github.com/philiprehberger/rb-state-machine/issues) [![Feature Requests](https://img.shields.io/badge/feature-requests-blue.svg)](https://github.com/philiprehberger/rb-state-machine/issues) [![GitHub Sponsors](https://img.shields.io/badge/sponsor-philiprehberger-ea4aaa.svg?logo=github)](https://github.com/sponsors/philiprehberger)
 
-Lightweight state machine DSL with transitions, guards, and callbacks
+Lightweight state machine DSL with transitions, guards, callbacks, history tracking, auto-transitions, parallel states, statistics, and graph export.
 
 ## Requirements
 
@@ -26,6 +23,8 @@ gem install philiprehberger-state_machine
 ```
 
 ## Usage
+
+### Basic State Machine
 
 ```ruby
 require "philiprehberger/state_machine"
@@ -120,6 +119,106 @@ order.can_ship?           # => false
 order.allowed_transitions # => [:pay]
 ```
 
+### State History
+
+Track previous states with timestamps:
+
+```ruby
+order = Order.new
+order.pay!
+order.state_history
+# => [{state: :pending, entered_at: <Time>}, {state: :paid, entered_at: <Time>}]
+order.previous_state  # => :pending
+```
+
+### Timed/Automatic Transitions
+
+Define transitions that trigger automatically after a time period:
+
+```ruby
+class Session
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :active do
+    event :refresh do
+      transition from: :active, to: :active
+    end
+
+    auto_transition from: :active, to: :expired, after: 1800
+  end
+end
+
+session = Session.new
+# Later, check if any auto-transitions should fire:
+session.check_auto_transitions!  # => true if expired, false otherwise
+```
+
+### Parallel States
+
+Activate concurrent substates during a transition:
+
+```ruby
+class Upload
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :idle do
+    event :start do
+      transition from: :idle, to: :processing
+      parallel_states :uploading, :validating
+    end
+
+    event :finish do
+      transition from: :processing, to: :done
+    end
+  end
+end
+
+upload = Upload.new
+upload.start!
+upload.parallel_states              # => [:uploading, :validating]
+upload.parallel_state_active?(:uploading)  # => true
+upload.finish!
+upload.parallel_states              # => []
+```
+
+### Transition Statistics
+
+Track transition counts and time spent in each state:
+
+```ruby
+order = Order.new
+order.pay!
+order.transition_count          # => 1
+order.time_in_state(:pending)   # => 0.003 (seconds)
+order.transition_stats
+# => {total_transitions: 1, transition_counts: {pending_to_paid: 1}, time_in_states: {...}}
+```
+
+### DOT/GraphViz Export
+
+Generate a visual state diagram in DOT format:
+
+```ruby
+puts Order.to_dot
+# digraph Order {
+#   rankdir=LR;
+#   __start__ [shape=point, width=0.2];
+#   __start__ -> pending;
+#   pending [shape=ellipse];
+#   ...
+# }
+```
+
+Render with GraphViz: `dot -Tpng -o states.png`
+
+### Unreachable State Detection
+
+Validate that all states can be reached from the initial state:
+
+```ruby
+Order.unreachable_states  # => [] (all reachable)
+```
+
 ## API
 
 | Method | Description |
@@ -127,6 +226,8 @@ order.allowed_transitions # => [:pay]
 | `state_machine(initial:, &block)` | Define a state machine on the class with an initial state |
 | `event(name, &block)` | Define an event inside the state machine block |
 | `transition(from:, to:, guard: nil)` | Define a transition inside an event block |
+| `parallel_states(*states)` | Activate concurrent substates during a transition |
+| `auto_transition(from:, to:, after:, guard: nil)` | Define a timed automatic transition |
 | `before_transition(to: nil, from: nil, &block)` | Register a callback that fires before a transition |
 | `after_transition(to: nil, from: nil, &block)` | Register a callback that fires after a transition |
 | `#current_state` | Returns the current state as a symbol |
@@ -135,6 +236,16 @@ order.allowed_transitions # => [:pay]
 | `#X!` | Fire event X or raise `InvalidTransition` |
 | `#X` | Fire event X, returns true on success, false on failure |
 | `#X?` | Returns true if current state is X |
+| `#state_history` | Returns array of `{state:, entered_at:}` hashes |
+| `#previous_state` | Returns the state before the current one, or nil |
+| `#transition_count` | Returns total number of transitions performed |
+| `#time_in_state(state)` | Returns seconds spent in the given state |
+| `#transition_stats` | Returns hash with counts and timing for all transitions |
+| `#parallel_states` | Returns array of currently active parallel substates |
+| `#parallel_state_active?(state)` | Returns true if the given substate is active |
+| `#check_auto_transitions!` | Fires any pending auto-transitions, returns true if one fired |
+| `.to_dot(name:)` | Generates DOT/GraphViz string for the state machine |
+| `.unreachable_states` | Returns array of states unreachable from initial |
 
 ## Development
 
@@ -143,6 +254,10 @@ bundle install
 bundle exec rspec
 bundle exec rubocop
 ```
+
+## Support
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-Philip%20Rehberger-blue?logo=linkedin)](https://linkedin.com/in/philiprehberger) [![More Packages](https://img.shields.io/badge/more-packages-blue.svg)](https://github.com/philiprehberger?tab=repositories)
 
 ## License
 
