@@ -55,6 +55,22 @@ module Philiprehberger
         @auto_transitions << AutoTransition.new(from: from, to: to, after: after, guard: guard)
       end
 
+      def on_enter(state, &block)
+        (@enter_hooks ||= {})[state] = block
+      end
+
+      def on_exit(state, &block)
+        (@exit_hooks ||= {})[state] = block
+      end
+
+      def enter_hooks
+        @enter_hooks || {}
+      end
+
+      def exit_hooks
+        @exit_hooks || {}
+      end
+
       # Returns all unique states referenced in the definition.
       #
       # @return [Array<Symbol>]

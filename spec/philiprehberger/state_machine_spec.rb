@@ -1181,4 +1181,85 @@ RSpec.describe Philiprehberger::StateMachine do
       expect(time).to be >= 0
     end
   end
+
+  describe 'on_enter and on_exit hooks' do
+    let(:klass) do
+      Class.new do
+        include Philiprehberger::StateMachine
+
+        attr_reader :hook_log
+
+        state_machine initial: :idle do
+          on_enter(:active) { |obj| obj.instance_variable_get(:@hook_log) << 'enter_active' }
+          on_exit(:idle) { |obj| obj.instance_variable_get(:@hook_log) << 'exit_idle' }
+          on_enter(:done) { |obj| obj.instance_variable_get(:@hook_log) << 'enter_done' }
+
+          event :start do
+            transition from: :idle, to: :active
+          end
+
+          event :finish do
+            transition from: :active, to: :done
+          end
+        end
+
+        def initialize
+          @hook_log = []
+          super
+        end
+      end
+    end
+
+    it 'fires on_exit when leaving a state' do
+      obj = klass.new
+      obj.start!
+      expect(obj.hook_log).to include('exit_idle')
+    end
+
+    it 'fires on_enter when entering a state' do
+      obj = klass.new
+      obj.start!
+      expect(obj.hook_log).to include('enter_active')
+    end
+
+    it 'fires hooks in correct order' do
+      obj = klass.new
+      obj.start!
+      expect(obj.hook_log).to eq(%w[exit_idle enter_active])
+    end
+
+    it 'fires hooks on subsequent transitions' do
+      obj = klass.new
+      obj.start!
+      obj.finish!
+      expect(obj.hook_log).to include('enter_done')
+    end
+  end
+
+  describe '#time_in_current_state' do
+    let(:klass) do
+      Class.new do
+        include Philiprehberger::StateMachine
+
+        state_machine initial: :idle do
+          event :start do
+            transition from: :idle, to: :active
+          end
+        end
+      end
+    end
+
+    it 'returns elapsed time in current state' do
+      obj = klass.new
+      sleep 0.01
+      expect(obj.time_in_current_state).to be > 0
+    end
+
+    it 'resets after transition' do
+      obj = klass.new
+      sleep 0.05
+      obj.start!
+      expect(obj.time_in_current_state).to be < 0.05
+    end
+  end
 end

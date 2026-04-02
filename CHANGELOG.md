@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-04-01
+
+### Added
+- `on_enter(state, &block)` for state-scoped entry callbacks
+- `on_exit(state, &block)` for state-scoped exit callbacks
+- `#time_in_current_state` for elapsed time in current state
+
 ## [0.2.2] - 2026-03-31
 
 ### Added

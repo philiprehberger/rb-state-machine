@@ -46,6 +46,7 @@ module Philiprehberger
 
         def define_state_accessors(klass)
           klass.define_method(:current_state) { @_sm_state }
+          klass.define_method(:time_in_current_state) { Time.now - @_sm_state_entered_at }
           klass.send(:define_method, :_sm_set_state) do |state|
             @_sm_state = state
             @_sm_state_entered_at = Time.now
@@ -121,6 +122,7 @@ module Philiprehberger
             to = transition.to
 
             definition.callback_set.execute(type: :before, from: from, to: to, context: self)
+            definition.exit_hooks[from]&.call(self)
             @_sm_history.record(to)
             @_sm_statistics.record_transition(from, to)
 
@@ -132,6 +134,7 @@ module Philiprehberger
             end
 
             _sm_set_state(to)
+            definition.enter_hooks[to]&.call(self)
             definition.callback_set.execute(type: :after, from: from, to: to, context: self)
 
             true
@@ -148,6 +151,7 @@ module Philiprehberger
             to = transition.to
 
             definition.callback_set.execute(type: :before, from: from, to: to, context: self)
+            definition.exit_hooks[from]&.call(self)
             @_sm_history.record(to)
             @_sm_statistics.record_transition(from, to)
 
@@ -159,6 +163,7 @@ module Philiprehberger
             end
 
             _sm_set_state(to)
+            definition.enter_hooks[to]&.call(self)
             definition.callback_set.execute(type: :after, from: from, to: to, context: self)
 
             true
