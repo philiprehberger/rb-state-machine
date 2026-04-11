@@ -52,6 +52,17 @@ module Philiprehberger
             @_sm_state_entered_at = Time.now
           end
           klass.send(:private, :_sm_set_state)
+
+          klass.send(:define_method, :_sm_invoke_hook) do |hook, payload|
+            return unless hook
+
+            if [0, 1].include?(hook.arity)
+              hook.call(self)
+            else
+              hook.call(self, payload)
+            end
+          end
+          klass.send(:private, :_sm_invoke_hook)
         end
 
         def define_history_methods(klass)
@@ -106,23 +117,30 @@ module Philiprehberger
         end
 
         def define_bang_method(klass, event_name, transitions, definition, parallel_defs)
-          klass.define_method(:"#{event_name}!") do
+          klass.define_method(:"#{event_name}!") do |**payload|
             transition = transitions.find { |t| t.matches?(current_state) }
             unless transition
               raise InvalidTransition,
                     "Cannot #{event_name} from #{current_state}"
             end
 
-            if transition.guard && !instance_exec(&transition.guard)
-              raise InvalidTransition,
-                    "Guard condition failed for #{event_name} from #{current_state}"
+            if transition.guard
+              guard_result = if transition.guard.arity.zero?
+                               instance_exec(&transition.guard)
+                             else
+                               instance_exec(**payload, &transition.guard)
+                             end
+              unless guard_result
+                raise InvalidTransition,
+                      "Guard condition failed for #{event_name} from #{current_state}"
+              end
             end
 
             from = current_state
             to = transition.to
 
-            definition.callback_set.execute(type: :before, from: from, to: to, context: self)
-            definition.exit_hooks[from]&.call(self)
+            definition.callback_set.execute(type: :before, from: from, to: to, context: self, payload: payload)
+            _sm_invoke_hook(definition.exit_hooks[from], payload)
             @_sm_history.record(to)
             @_sm_statistics.record_transition(from, to)
 
@@ -134,24 +152,32 @@ module Philiprehberger
             end
 
             _sm_set_state(to)
-            definition.enter_hooks[to]&.call(self)
-            definition.callback_set.execute(type: :after, from: from, to: to, context: self)
+            _sm_invoke_hook(definition.enter_hooks[to], payload)
+            definition.callback_set.execute(type: :after, from: from, to: to, context: self, payload: payload)
 
             true
           end
         end
 
         def define_safe_method(klass, event_name, transitions, definition, parallel_defs)
-          klass.define_method(event_name) do
+          klass.define_method(event_name) do |**payload|
             transition = transitions.find { |t| t.matches?(current_state) }
             return false unless transition
-            return false if transition.guard && !instance_exec(&transition.guard)
+
+            if transition.guard
+              guard_result = if transition.guard.arity.zero?
+                               instance_exec(&transition.guard)
+                             else
+                               instance_exec(**payload, &transition.guard)
+                             end
+              return false unless guard_result
+            end
 
             from = current_state
             to = transition.to
 
-            definition.callback_set.execute(type: :before, from: from, to: to, context: self)
-            definition.exit_hooks[from]&.call(self)
+            definition.callback_set.execute(type: :before, from: from, to: to, context: self, payload: payload)
+            _sm_invoke_hook(definition.exit_hooks[from], payload)
             @_sm_history.record(to)
             @_sm_statistics.record_transition(from, to)
 
@@ -163,18 +189,26 @@ module Philiprehberger
             end
 
             _sm_set_state(to)
-            definition.enter_hooks[to]&.call(self)
-            definition.callback_set.execute(type: :after, from: from, to: to, context: self)
+            _sm_invoke_hook(definition.enter_hooks[to], payload)
+            definition.callback_set.execute(type: :after, from: from, to: to, context: self, payload: payload)
 
             true
           end
         end
 
         def define_can_method(klass, event_name, transitions)
-          klass.define_method(:"can_#{event_name}?") do
+          klass.define_method(:"can_#{event_name}?") do |**payload|
             transition = transitions.find { |t| t.matches?(current_state) }
             return false unless transition
-            return false if transition.guard && !instance_exec(&transition.guard)
+
+            if transition.guard
+              guard_result = if transition.guard.arity.zero?
+                               instance_exec(&transition.guard)
+                             else
+                               instance_exec(**payload, &transition.guard)
+                             end
+              return false unless guard_result
+            end
 
             true
           end
@@ -187,11 +221,19 @@ module Philiprehberger
         end
 
         def define_introspection(klass, definition)
-          klass.define_method(:allowed_transitions) do
+          klass.define_method(:allowed_transitions) do |**payload|
             definition.events.select do |_name, transitions|
               transition = transitions.find { |t| t.matches?(current_state) }
               next false unless transition
-              next false if transition.guard && !instance_exec(&transition.guard)
+
+              if transition.guard
+                guard_result = if transition.guard.arity.zero?
+                                 instance_exec(&transition.guard)
+                               else
+                                 instance_exec(**payload, &transition.guard)
+                               end
+                next false unless guard_result
+              end
 
               true
             end.keys
