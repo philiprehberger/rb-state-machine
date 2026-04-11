@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-04-19
+
+### Added
+- `#stuck?` — returns `true` iff the instance has no allowed transitions AND the current state is not marked `final: true`; distinguishes dead-ends from legitimate terminal states
+
 ## [0.5.0] - 2026-04-16
 
 ### Added

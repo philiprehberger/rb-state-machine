@@ -220,6 +220,29 @@ class TestFinalStates
   end
 end
 
+class TestStuck
+  include Philiprehberger::StateMachine
+
+  state_machine initial: :start do
+    state :done, final: true
+    state :dead_end
+    state :start
+    state :middle
+
+    event :finish do
+      transition from: :middle, to: :done
+    end
+
+    event :advance do
+      transition from: :start, to: :middle
+    end
+
+    event :derail do
+      transition from: :start, to: :dead_end
+    end
+  end
+end
+
 RSpec.describe Philiprehberger::StateMachine do
   it 'has a version number' do
     expect(Philiprehberger::StateMachine::VERSION).not_to be_nil
@@ -1483,6 +1506,38 @@ RSpec.describe Philiprehberger::StateMachine do
     it 'includes declared-only final states in all_states' do
       defn = TestFinalStates._sm_definition
       expect(defn.all_states).to include(:done, :cancelled, :pending)
+    end
+  end
+
+  describe '#stuck?' do
+    it 'returns false when in a final state' do
+      obj = TestStuck.new
+      obj.advance!
+      obj.finish!
+      expect(obj.final?).to be true
+      expect(obj.stuck?).to be false
+    end
+
+    it 'returns false when the current state has available events' do
+      obj = TestStuck.new
+      expect(obj.allowed_transitions).not_to be_empty
+      expect(obj.stuck?).to be false
+    end
+
+    it 'returns true for a non-final state with no allowed events' do
+      obj = TestStuck.new
+      obj.derail!
+      expect(obj.current_state).to eq(:dead_end)
+      expect(obj.final?).to be false
+      expect(obj.allowed_transitions).to be_empty
+      expect(obj.stuck?).to be true
+    end
+
+    it 'returns true after transitioning into a dead-end non-final state' do
+      obj = TestStuck.new
+      expect(obj.stuck?).to be false
+      obj.derail!
+      expect(obj.stuck?).to be true
     end
   end
 end

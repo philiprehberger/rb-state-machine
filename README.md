@@ -301,6 +301,18 @@ Job._sm_definition.final_state?(:done)  # => true
 
 `#final?` and `#terminal?` are aliases; use whichever reads better in your domain.
 
+Use `#stuck?` to distinguish a dead-end state (no allowed transitions, but not declared final) from a legitimate terminal state:
+
+```ruby
+order = Order.new
+order.final?  # => false
+order.stuck?  # => false
+
+order.to_cancelled!
+order.final?  # => true   (if :cancelled is declared final)
+order.stuck?  # => false
+```
+
 ## API
 
 | Method | Description |
@@ -320,6 +332,7 @@ Job._sm_definition.final_state?(:done)  # => true
 | `#X(**payload)` | Fire event X with optional payload, returns true on success, false on failure |
 | `#X?` | Returns true if current state is X |
 | `#final?` / `#terminal?` | Returns true if the current state is declared final |
+| `#stuck?` | Returns true if no allowed transitions remain AND the current state is not declared final |
 | `Definition#final_state?(name)` | Returns true if the given state is declared final |
 | `#state_history` | Returns array of `{state:, entered_at:}` hashes |
 | `#previous_state` | Returns the state before the current one, or nil |
