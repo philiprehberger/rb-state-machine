@@ -18,6 +18,7 @@ module Philiprehberger
           define_auto_transition_methods(klass, definition)
           define_event_methods(klass, definition)
           define_state_predicates(klass, definition)
+          define_final_state_predicates(klass, definition)
           define_introspection(klass, definition)
         end
 
@@ -218,6 +219,11 @@ module Philiprehberger
           definition.all_states.each do |state|
             klass.define_method(:"#{state}?") { current_state == state }
           end
+        end
+
+        def define_final_state_predicates(klass, definition)
+          klass.define_method(:final?) { definition.final_state?(current_state) }
+          klass.define_method(:terminal?) { definition.final_state?(current_state) }
         end
 
         def define_introspection(klass, definition)
