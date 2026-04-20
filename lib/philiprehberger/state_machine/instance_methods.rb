@@ -224,6 +224,13 @@ module Philiprehberger
         def define_final_state_predicates(klass, definition)
           klass.define_method(:final?) { definition.final_state?(current_state) }
           klass.define_method(:terminal?) { definition.final_state?(current_state) }
+
+          # Returns true if the instance has no allowed transitions AND the current
+          # state is not marked `final: true`. Distinguishes a dead-end state (no way
+          # out, but not declared terminal) from a legitimate final state.
+          #
+          # @return [Boolean] true when stuck with no outgoing transitions, false otherwise
+          klass.define_method(:stuck?) { allowed_transitions.empty? && !final? }
         end
 
         def define_introspection(klass, definition)
