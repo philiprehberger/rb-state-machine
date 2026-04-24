@@ -51,6 +51,20 @@ module Philiprehberger
         total
       end
 
+      # Transition key (e.g. `:a_to_b`) recorded most often.
+      #
+      # Returns `nil` when no transitions have been recorded. When multiple
+      # transitions tie for the highest count, returns the first one
+      # encountered via `Hash#max_by` (i.e., insertion order among ties).
+      #
+      # @return [Symbol, nil]
+      def busiest_transition
+        return nil if @transition_counts.empty?
+
+        key, _count = @transition_counts.max_by { |_, count| count }
+        key
+      end
+
       # Return full statistics as a hash.
       #
       # @return [Hash]

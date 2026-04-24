@@ -196,6 +196,17 @@ order.transition_stats
 # => {total_transitions: 1, transition_counts: {pending_to_paid: 1}, time_in_states: {...}}
 ```
 
+Fetch the single most frequently recorded transition:
+
+```ruby
+stats = Philiprehberger::StateMachine::Statistics.new(:a)
+stats.record_transition(:a, :b)
+stats.record_transition(:b, :a)
+stats.record_transition(:a, :b)
+
+stats.busiest_transition  # => :a_to_b
+```
+
 ### State Lifecycle Hooks
 
 Fire callbacks when entering or leaving a specific state, regardless of which event triggered the transition:
@@ -339,6 +350,7 @@ order.stuck?  # => false
 | `#transition_count` | Returns total number of transitions performed |
 | `#time_in_state(state)` | Returns seconds spent in the given state |
 | `#transition_stats` | Returns hash with counts and timing for all transitions |
+| `Statistics#busiest_transition` | Returns the most frequently recorded transition key (e.g. `:a_to_b`) or `nil` |
 | `#parallel_states` | Returns array of currently active parallel substates |
 | `#parallel_state_active?(state)` | Returns true if the given substate is active |
 | `on_enter(state, &block)` | Callback fired when entering a state |

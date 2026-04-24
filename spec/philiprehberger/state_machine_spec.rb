@@ -1221,6 +1221,36 @@ RSpec.describe Philiprehberger::StateMachine do
       time = stats.time_in_state(:idle)
       expect(time).to be >= 0
     end
+
+    describe '#busiest_transition' do
+      it 'returns nil when no transitions have been recorded' do
+        stats = Philiprehberger::StateMachine::Statistics.new(:idle)
+        expect(stats.busiest_transition).to be_nil
+      end
+
+      it 'returns the sole transition key when only one is recorded' do
+        stats = Philiprehberger::StateMachine::Statistics.new(:a)
+        stats.record_transition(:a, :b)
+        expect(stats.busiest_transition).to eq(:a_to_b)
+      end
+
+      it 'returns the most frequent transition key' do
+        stats = Philiprehberger::StateMachine::Statistics.new(:a)
+        stats.record_transition(:a, :b)
+        stats.record_transition(:b, :a)
+        stats.record_transition(:a, :b)
+        stats.record_transition(:b, :a)
+        stats.record_transition(:a, :b)
+        expect(stats.busiest_transition).to eq(:a_to_b)
+      end
+
+      it 'breaks ties by insertion order' do
+        stats = Philiprehberger::StateMachine::Statistics.new(:a)
+        stats.record_transition(:a, :b)
+        stats.record_transition(:b, :c)
+        expect(stats.busiest_transition).to eq(:a_to_b)
+      end
+    end
   end
 
   describe 'on_enter and on_exit hooks' do

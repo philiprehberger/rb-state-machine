@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-24
+
+### Added
+- `Statistics#busiest_transition` — returns the transition key (e.g. `:a_to_b`) recorded most often, or `nil` when no transitions have occurred; ties break by insertion order
+
 ## [0.6.0] - 2026-04-19
 
 ### Added
