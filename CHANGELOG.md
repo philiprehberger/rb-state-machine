@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-05-08
+
+### Added
+- `#can_transition_to?(state, **payload)` — returns `true` when any currently-fireable event would land the machine in `state`. Honours guards (a guarded-out transition reports `false`) and raises `ArgumentError` for unknown states. Useful for UI gating without hand-rolling the per-event lookup.
+
 ## [0.7.0] - 2026-04-24
 
 ### Added

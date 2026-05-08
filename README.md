@@ -114,11 +114,13 @@ Query the state machine at runtime:
 ```ruby
 order = Order.new
 
-order.pending?            # => true
-order.paid?               # => false
-order.can_pay?            # => true
-order.can_ship?           # => false
-order.allowed_transitions # => [:pay]
+order.pending?              # => true
+order.paid?                 # => false
+order.can_pay?              # => true
+order.can_ship?             # => false
+order.allowed_transitions   # => [:pay]
+order.can_transition_to?(:paid)     # => true
+order.can_transition_to?(:shipped)  # => false (no event leads there from :pending)
 ```
 
 ### State History
@@ -339,6 +341,7 @@ order.stuck?  # => false
 | `#current_state` | Returns the current state as a symbol |
 | `#can_X?(**payload)` | Returns true if event X can fire from the current state (including guards) |
 | `#allowed_transitions(**payload)` | Returns an array of event names that can fire from the current state |
+| `#can_transition_to?(state, **payload)` | Returns true if any currently-fireable event would land the machine in `state` (honours guards; raises ArgumentError for unknown states) |
 | `#X!(**payload)` | Fire event X with optional payload, or raise `InvalidTransition` |
 | `#X(**payload)` | Fire event X with optional payload, returns true on success, false on failure |
 | `#X?` | Returns true if current state is X |

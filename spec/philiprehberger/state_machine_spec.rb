@@ -394,6 +394,34 @@ RSpec.describe Philiprehberger::StateMachine do
     end
   end
 
+  describe '#can_transition_to?' do
+    it 'returns true when an allowed event leads to the target state' do
+      order = TestOrder.new
+      expect(order.can_transition_to?(:paid)).to be true
+      expect(order.can_transition_to?(:cancelled)).to be true
+    end
+
+    it 'returns false when no event currently leads to the target state' do
+      order = TestOrder.new
+      expect(order.can_transition_to?(:shipped)).to be false
+      expect(order.can_transition_to?(:delivered)).to be false
+    end
+
+    it 'returns false when the only candidate transition is guarded out' do
+      order = TestOrder.new
+      order.pay!
+      # ship requires tracking_number guard
+      expect(order.can_transition_to?(:shipped)).to be false
+      order.tracking_number = 'TRACK'
+      expect(order.can_transition_to?(:shipped)).to be true
+    end
+
+    it 'raises ArgumentError for an unknown state' do
+      order = TestOrder.new
+      expect { order.can_transition_to?(:warpdrive) }.to raise_error(ArgumentError, /Unknown state/)
+    end
+  end
+
   describe 'before callbacks' do
     it 'fires before state change' do
       order = TestOrder.new

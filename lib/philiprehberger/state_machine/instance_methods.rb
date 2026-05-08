@@ -251,6 +251,36 @@ module Philiprehberger
               true
             end.keys
           end
+
+          # Whether any currently-fireable event would land the machine in `state`.
+          # Honours guards (a guarded-out transition reports false). Useful for UI
+          # gating without hand-rolling the per-event lookup.
+          #
+          # @param state [Symbol] the candidate target state
+          # @param payload [Hash] keyword payload forwarded to guards that accept it
+          # @return [Boolean]
+          # @raise [ArgumentError] if `state` is not declared on the machine
+          klass.define_method(:can_transition_to?) do |state, **payload|
+            unless definition.all_states.include?(state)
+              raise ArgumentError, "Unknown state: #{state.inspect}"
+            end
+
+            definition.events.any? do |_name, transitions|
+              transition = transitions.find { |t| t.matches?(current_state) && t.to == state }
+              next false unless transition
+
+              if transition.guard
+                guard_result = if transition.guard.arity.zero?
+                                 instance_exec(&transition.guard)
+                               else
+                                 instance_exec(**payload, &transition.guard)
+                               end
+                next false unless guard_result
+              end
+
+              true
+            end
+          end
         end
       end
     end
